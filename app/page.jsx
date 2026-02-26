@@ -17,19 +17,7 @@ import {
   X,
 } from 'lucide-react';
 
-export default function NZCompanyWidget() {
-  const [zohoContext, setZohoContext] = useState({ accountId: '', nzbn: '', accountName: '' });
-  useEffect(() => {
-    getZohoAccountContext().then((ctx) => {
-      setZohoContext(ctx);
-      // If NZBN found, pre-fill search
-      // You may want to add searchParams state here as well
-    });
-  }, []);
-  // ...existing code...
-
-
-
+// --- Helper Components ---
 const StatusBadge = ({ status }) => {
   const styles = status === 'Registered'
     ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
@@ -53,6 +41,129 @@ const RoleBadge = ({ role }) => (
 );
 
 export default function NZCompanyWidget() {
+  const [zohoContext, setZohoContext] = useState({ accountId: '', nzbn: '', accountName: '' });
+  const [step, setStep] = useState('search');
+  const [loading, setLoading] = useState(false);
+  const [searchParams, setSearchParams] = useState({ firstName: '', lastName: '' });
+  const [results, setResults] = useState([]);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [filters, setFilters] = useState({ roles: [], status: 'All' });
+  const [viewDetails, setViewDetails] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [importSummary, setImportSummary] = useState({
+    contactId: '',
+    createdAccounts: 0,
+  });
+
+  useEffect(() => {
+    getZohoAccountContext().then((ctx) => {
+      setZohoContext(ctx);
+      // If NZBN found, pre-fill search
+      // You may want to add searchParams state here as well
+    });
+  }, []);
+
+  const handleSearch = async (event) => {
+    event.preventDefault();
+    if (!searchParams.firstName && !searchParams.lastName && !zohoContext.nzbn) {
+      setErrorMessage('Please enter a name or NZBN.');
+      return;
+    }
+    setErrorMessage('');
+    setLoading(true);
+    try {
+      const response = await fetch('/api/nz-company-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: searchParams.firstName,
+          lastName: searchParams.lastName,
+          nzbn: zohoContext.nzbn || '',
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error || 'NZ Companies search failed.');
+      }
+      // Map API response to results
+      setResults(payload.results?.entities || []);
+      setLoading(false);
+      setStep('results');
+    } catch (error) {
+      setErrorMessage(error.message || 'Unable to search registry.');
+      setLoading(false);
+    }
+  };
+
+  const toggleSelection = (id) => {
+    setSelectedIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleImport = async () => {
+    setImporting(true);
+    setErrorMessage('');
+
+    try {
+      const entities = results.filter((item) => selectedIds.has(item.id));
+      const response = await fetch('/api/import', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          person: {
+            firstName: searchParams.firstName,
+            lastName: searchParams.lastName,
+          },
+          entities,
+          zohoContext,
+        }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Import to Zoho failed.');
+      }
+
+      setImportSummary({
+        contactId: payload?.summary?.contactId || '',
+        createdAccounts: payload?.summary?.createdAccounts || 0,
+      });
+      setStep('success');
+    } catch (error) {
+      setErrorMessage(error.message || 'Unable to import data.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const filteredResults = results.filter((item) => {
+    const matchRole = filters.roles.length === 0 || filters.roles.includes(item.role);
+    const matchStatus = filters.status === 'All'
+      || (filters.status === 'Active' && item.status === 'Registered')
+      || (filters.status === 'Inactive' && item.status !== 'Registered');
+    return matchRole && matchStatus;
+  });
+
+  const resetSearch = () => {
+    setStep('search');
+    setResults([]);
+    setSelectedIds(new Set());
+    setSearchParams({ firstName: '', lastName: '' });
+    setErrorMessage('');
+    setImportSummary({ contactId: '', createdAccounts: 0 });
+  };
+
+  // ...rest of your component code (renderSearchStep, renderResultsStep, etc.)...
   const [step, setStep] = useState('search');
   const [loading, setLoading] = useState(false);
   const [searchParams, setSearchParams] = useState({ firstName: '', lastName: '' });
