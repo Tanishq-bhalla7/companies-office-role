@@ -2,17 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { getZohoAccountContext } from '@/lib/zoho-widget';
-
-export default function NZCompanyWidget() {
-  const [zohoContext, setZohoContext] = useState({ accountId: '', nzbn: '', accountName: '' });
-  useEffect(() => {
-    getZohoAccountContext().then((ctx) => {
-      setZohoContext(ctx);
-      // If NZBN found, pre-fill search
-      // You may want to add searchParams state here as well
-    });
-  }, []);
-  // ...existing code...
 import {
   Search,
   Filter,
@@ -27,6 +16,17 @@ import {
   Check,
   X,
 } from 'lucide-react';
+
+export default function NZCompanyWidget() {
+  const [zohoContext, setZohoContext] = useState({ accountId: '', nzbn: '', accountName: '' });
+  useEffect(() => {
+    getZohoAccountContext().then((ctx) => {
+      setZohoContext(ctx);
+      // If NZBN found, pre-fill search
+      // You may want to add searchParams state here as well
+    });
+  }, []);
+  // ...existing code...
 
 
 
