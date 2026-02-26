@@ -1,21 +1,18 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { getZohoAccountContext } from '@/lib/zoho-widget';
-  // Zoho CRM widget context
-  const [zohoContext, setZohoContext] = useState({ accountId: '', nzbn: '', accountName: '' });
 
+export default function NZCompanyWidget() {
+  const [zohoContext, setZohoContext] = useState({ accountId: '', nzbn: '', accountName: '' });
   useEffect(() => {
-    // On mount, try to fetch Zoho CRM context
     getZohoAccountContext().then((ctx) => {
       setZohoContext(ctx);
       // If NZBN found, pre-fill search
-      if (ctx.nzbn && !searchParams.lastName && !searchParams.firstName) {
-        setSearchParams((prev) => ({ ...prev, lastName: ctx.accountName, firstName: '', }));
-      }
+      // You may want to add searchParams state here as well
     });
   }, []);
+  // ...existing code...
 import {
   Search,
   Filter,
@@ -31,33 +28,7 @@ import {
   X,
 } from 'lucide-react';
 
-const MOCK_ROLES = ['Director', 'Shareholder', 'CEO', 'Secretary'];
-const MOCK_STATUSES = ['Registered', 'In Liquidation', 'Removed', 'Receivership'];
 
-const generateMockData = (firstName, lastName) => {
-  const count = Math.floor(Math.random() * 8) + 2;
-  const entities = [];
-
-  const companyPrefixes = ['Kiwi', 'Aotearoa', 'Silver Fern', 'Wellington', 'Auckland', 'Southern', 'Pacific', 'Mana'];
-  const companySuffixes = ['Holdings Ltd', 'Technologies', 'Properties', 'Consulting', 'Logistics', 'Investments', 'Group', 'Solutions'];
-
-  for (let index = 0; index < count; index += 1) {
-    const isActive = Math.random() > 0.3;
-    entities.push({
-      id: `nzbn-${Math.floor(Math.random() * 1000000000)}`,
-      name: `${companyPrefixes[Math.floor(Math.random() * companyPrefixes.length)]} ${companySuffixes[Math.floor(Math.random() * companySuffixes.length)]}`,
-      nzbn: `94290${Math.floor(Math.random() * 1000000)}`,
-      status: isActive ? 'Registered' : MOCK_STATUSES[Math.floor(Math.random() * MOCK_STATUSES.length)],
-      incorporationDate: `${Math.floor(Math.random() * 28) + 1}/${Math.floor(Math.random() * 12) + 1}/${2000 + Math.floor(Math.random() * 23)}`,
-      address: `${Math.floor(Math.random() * 100) + 1} ${['Queen', 'Victoria', 'Lambton', 'Willis'][Math.floor(Math.random() * 4)]} Street, ${['Auckland', 'Wellington', 'Christchurch'][Math.floor(Math.random() * 3)]}`,
-      role: MOCK_ROLES[Math.floor(Math.random() * MOCK_ROLES.length)],
-      individualName: `${firstName} ${lastName}`,
-      shareAllocation: `${Math.floor(Math.random() * 100)}%`,
-    });
-  }
-
-  return entities;
-};
 
 const StatusBadge = ({ status }) => {
   const styles = status === 'Registered'
@@ -98,19 +69,34 @@ export default function NZCompanyWidget() {
 
   const handleSearch = async (event) => {
     event.preventDefault();
-    if (!searchParams.firstName || !searchParams.lastName) {
+    if (!searchParams.firstName && !searchParams.lastName && !zohoContext.nzbn) {
+      setErrorMessage('Please enter a name or NZBN.');
       return;
     }
-
     setErrorMessage('');
     setLoading(true);
-
-    setTimeout(() => {
-      const data = generateMockData(searchParams.firstName, searchParams.lastName);
-      setResults(data);
+    try {
+      const response = await fetch('/api/nz-company-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: searchParams.firstName,
+          lastName: searchParams.lastName,
+          nzbn: zohoContext.nzbn || '',
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error || 'NZ Companies search failed.');
+      }
+      // Map API response to results
+      setResults(payload.results?.entities || []);
       setLoading(false);
       setStep('results');
-    }, 1200);
+    } catch (error) {
+      setErrorMessage(error.message || 'Unable to search registry.');
+      setLoading(false);
+    }
   };
 
   const toggleSelection = (id) => {
