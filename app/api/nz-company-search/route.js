@@ -1,42 +1,28 @@
+// app/api/search/route.js
 import { NextResponse } from 'next/server';
 
-const NZ_COMPANIES_API = 'https://portal.api.business.govt.nz/api/companies-entity-role-search';
+export async function GET(request) {
+  const { searchParams } = new URL(request.url);
+  const name = searchParams.get('name');
 
-export async function POST(request) {
+  if (!name) return NextResponse.json({ error: 'Name required' }, { status: 400 });
+
+  // Endpoint for NZ Companies Office "Entities" search
+  const endpoint = `https://api.business.govt.nz/services/v4/companies-office/entities?q=${encodeURIComponent(name)}`;
+
   try {
-    const { firstName, lastName, nzbn } = await request.json();
-    if (!firstName && !lastName && !nzbn) {
-      return NextResponse.json({ error: 'At least one search parameter required.' }, { status: 400 });
-    }
-
-    // You must set NZ_COMPANIES_API_KEY in your .env.local
-    const apiKey = process.env.NZ_COMPANIES_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: 'NZ Companies API key missing.' }, { status: 500 });
-    }
-
-    const payload = {
-      firstName,
-      lastName,
-      nzbn,
-    };
-
-    const response = await fetch(NZ_COMPANIES_API, {
-      method: 'POST',
+    const res = await fetch(endpoint, {
       headers: {
-        'Content-Type': 'application/json',
-        'Ocp-Apim-Subscription-Key': apiKey,
+        'Authorization': `Bearer ${process.env.NZ_COMPANIES_API_KEY}`,
+        'Accept': 'application/json',
       },
-      body: JSON.stringify(payload),
     });
 
-    const data = await response.json();
-    if (!response.ok) {
-      return NextResponse.json({ error: data?.message || 'NZ Companies API error.' }, { status: 500 });
-    }
-
-    return NextResponse.json({ results: data });
+    if (!res.ok) throw new Error(`NZ API Error: ${res.statusText}`);
+    const data = await res.json();
+    return NextResponse.json(data);
+    
   } catch (error) {
-    return NextResponse.json({ error: error.message || 'Unexpected error.' }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
