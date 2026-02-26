@@ -1,6 +1,20 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getZohoAccountContext } from '@/lib/zoho-widget';
+  // Zoho CRM widget context
+  const [zohoContext, setZohoContext] = useState({ accountId: '', nzbn: '', accountName: '' });
+
+  useEffect(() => {
+    // On mount, try to fetch Zoho CRM context
+    getZohoAccountContext().then((ctx) => {
+      setZohoContext(ctx);
+      // If NZBN found, pre-fill search
+      if (ctx.nzbn && !searchParams.lastName && !searchParams.firstName) {
+        setSearchParams((prev) => ({ ...prev, lastName: ctx.accountName, firstName: '', }));
+      }
+    });
+  }, []);
 import {
   Search,
   Filter,
@@ -127,6 +141,7 @@ export default function NZCompanyWidget() {
             lastName: searchParams.lastName,
           },
           entities,
+          zohoContext,
         }),
       });
 
@@ -171,7 +186,10 @@ export default function NZCompanyWidget() {
       </div>
       <h2 className="text-2xl font-bold text-slate-800 mb-2">NZ Companies Search</h2>
       <p className="text-slate-500 mb-8 max-w-md">
-        Enter an individual&apos;s name to find their directorships and shareholdings from the NZ Companies Office register.
+        Enter an individual's name to find their directorships and shareholdings from the NZ Companies Office register.
+        {zohoContext.accountId && (
+          <span className="block mt-2 text-xs text-blue-700 font-semibold">Zoho Account ID: {zohoContext.accountId} | NZBN: {zohoContext.nzbn}</span>
+        )}
       </p>
 
       <form onSubmit={handleSearch} className="w-full max-w-md space-y-4">
